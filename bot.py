@@ -26,8 +26,24 @@ votos = defaultdict(set)
 participacion = defaultdict(int)
 propuesta_id = 1
 
-### Lógica de comandos (puedes copiar todas tus funciones originales aquí, como /proponer, /verpropuestas, etc.)
-# (aquí van todas tus funciones tal como las tenías, sin cambios)
+# Función faltante para evitar el error
+async def saludo_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="¡Gracias por agregarme al grupo! 🎉 Usa /ayuda para ver qué puedo hacer."
+        )
+
+# Puedes colocar tus funciones originales aquí: ayuda, proponer, verpropuestas, votar, top, borrar, participacion_cmd, bienvenida_nuevos
+# Por ejemplo, una función de ejemplo:
+async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Comandos disponibles:\n/proponer\n/verpropuestas\n/votar\n/top\n/borrar\n/participacion"
+    )
+
+# Aquí irían las demás funciones (proponer, verpropuestas, votar, etc.)
+# ...
 
 ### Bot y FastAPI
 app = FastAPI()
