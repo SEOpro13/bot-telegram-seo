@@ -1,6 +1,5 @@
- fastapi
- uvicorn
- python-telegram-bot==20.7
- httpx
--supabase-py
-+supabase
+fastapi
+uvicorn
+python-telegram-bot==20.7
+httpx
+supabase
