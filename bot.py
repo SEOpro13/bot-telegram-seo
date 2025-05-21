@@ -19,7 +19,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "AAGIrhr7ESef1Rt9xmt_Zv4Qw9wPqjjRvvE")  # Mejor usar variable de entorno
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "7545362589:AAGIrhr7ESef1Rt9xmt_Zv4Qw9wPqjjRvvE")  # Mejor usar variable de entorno
 
 propuestas = {}
 votos = defaultdict(set)
