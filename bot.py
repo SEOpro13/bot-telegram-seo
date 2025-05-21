@@ -16,7 +16,8 @@ logging.basicConfig(
 )
 
 # Token de tu bot
-TELEGRAM_TOKEN = "7545362589:AAGIrhr7ESef1Rt9xmt_Zv4Qw9wPqjjRvvE"
+import os
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # Almacenes en memoria (se puede sustituir por DB en futuro)
 propuestas = {}
