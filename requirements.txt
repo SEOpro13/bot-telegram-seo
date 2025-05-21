@@ -2,4 +2,4 @@ fastapi
 uvicorn
 python-telegram-bot==20.7
 httpx
-supabase
+supabase==1.0.0
