@@ -22,6 +22,7 @@ logging.basicConfig(
 )
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "7545362589:AAGIrhr7ESef1Rt9xmt_Zv4Qw9wPqjjRvvE")
+ADMIN_ID = 1011479473
 
 # === COMANDOS ===
 
@@ -33,7 +34,8 @@ async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/votar <id> - Vota por una propuesta\n"
         "/top - Ver propuestas más votadas\n"
         "/borrar <id> - Borra tu propuesta\n"
-        "/participacion - Ver participación del grupo",
+        "/participacion - Ver participación del grupo\n"
+        "/reiniciar - Reiniciar todo (solo admin)",
         parse_mode="Markdown"
     )
 
@@ -102,6 +104,15 @@ async def participacion_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mensaje += f"{nombre}: {count} propuestas\n"
     await update.message.reply_text(mensaje, parse_mode="Markdown")
 
+async def reiniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ No tienes permisos para usar este comando.")
+        return
+
+    from database import reiniciar_datos
+    reiniciar_datos()
+    await update.message.reply_text("🗑️ Todos los datos han sido reiniciados. ¡Nueva ronda iniciada!")
+
 async def saludo_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
         await context.bot.send_message(
@@ -125,6 +136,7 @@ bot_app.add_handler(CommandHandler("votar", votar))
 bot_app.add_handler(CommandHandler("top", top))
 bot_app.add_handler(CommandHandler("borrar", borrar))
 bot_app.add_handler(CommandHandler("participacion", participacion_cmd))
+bot_app.add_handler(CommandHandler("reiniciar", reiniciar))
 bot_app.add_handler(ChatMemberHandler(saludo_grupo, ChatMemberHandler.MY_CHAT_MEMBER))
 bot_app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_nuevos))
 
