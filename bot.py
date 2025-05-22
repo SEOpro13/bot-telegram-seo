@@ -160,6 +160,7 @@ async def root():
 @app.on_event("startup")
 async def on_startup():
     await bot_app.initialize()
+    await bot_app.start()
     webhook_url = "https://bot-telegram-seo.onrender.com/webhook"
     await bot_app.bot.set_webhook(
         url=webhook_url,
@@ -169,4 +170,5 @@ async def on_startup():
 
 @app.on_event("shutdown")
 async def on_shutdown():
+    await bot_app.stop()
     await bot_app.shutdown()
