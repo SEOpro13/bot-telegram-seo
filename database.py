@@ -2,7 +2,6 @@ import os
 import httpx
 from typing import List, Dict, Any
 
-# Configuración de Supabase REST
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 HEADERS = {
@@ -11,12 +10,9 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# Nombres de tablas
 PROPOSALS_TABLE = "proposals"
 VOTES_TABLE = "votes"
 PARTICIPATION_TABLE = "participation"
-
-# ID del administrador
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 
 async def registrar_propuesta(texto: str, user) -> int:
@@ -30,7 +26,6 @@ async def registrar_propuesta(texto: str, user) -> int:
             "nombre_autor": user.first_name
         }
 
-        # Insertar propuesta
         resp = await client.post(
             f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}",
             headers=headers,
@@ -40,11 +35,11 @@ async def registrar_propuesta(texto: str, user) -> int:
         data = resp.json()[0]
         pid = data["id"]
 
-        # Llamar a la función Supabase para aumentar participación
+        # Actualizar participación con nombre
         await client.post(
             f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
             headers=HEADERS,
-            json={"uid_input": user.id}
+            json={"uid_input": user.id, "nombre_input": user.first_name}
         )
 
     return pid
@@ -60,7 +55,6 @@ async def obtener_propuestas() -> List[Dict[str, Any]]:
 
 async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
     async with httpx.AsyncClient() as client:
-        # Verificar si ya votó
         check = await client.get(
             f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=eq.{uid}&proposal_id=eq.{pid}",
             headers=HEADERS
@@ -68,32 +62,29 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
         if check.json():
             return "⚠️ Ya has votado por esta propuesta."
 
-        # Registrar el voto
         await client.post(
             f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}",
             headers=HEADERS,
             json={"uid": uid, "proposal_id": pid}
         )
 
-        # Obtener votos actuales
         resp2 = await client.get(
             f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=votos&id=eq.{pid}",
             headers=HEADERS
         )
         votos_actuales = resp2.json()[0]["votos"]
 
-        # Incrementar conteo de votos
         await client.patch(
             f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}",
             headers=HEADERS,
             json={"votos": votos_actuales + 1}
         )
 
-        # Llamar a la función para incrementar participación
+        # Actualizar participación del votante
         await client.post(
             f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
             headers=HEADERS,
-            json={"uid_input": uid}
+            json={"uid_input": uid, "nombre_input": nombre}
         )
 
     return "✅ ¡Voto registrado!"
@@ -142,17 +133,13 @@ async def obtener_participacion() -> List[Dict[str, Any]]:
         return resp.json()
 
 async def reiniciar_datos():
-    """Elimina todas las propuestas, votos y participaciones"""
     async with httpx.AsyncClient() as client:
         await client.delete(f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=gt.0", headers=HEADERS)
         await client.delete(f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?uid=gt.0", headers=HEADERS)
         await client.delete(f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=gt.0", headers=HEADERS)
-
-        # Llamar a función que reinicia la secuencia del ID
         await reiniciar_conteo_propuestas()
 
 async def reiniciar_conteo_propuestas():
-    """Llama la función en Supabase para reiniciar el ID de propuestas a 1"""
     async with httpx.AsyncClient() as client:
         await client.post(
             f"{SUPABASE_URL}/rest/v1/rpc/reset_proposal_id_sequence",
