@@ -1,26 +1,28 @@
-# bot.py
-
 import logging
 import os
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import JSONResponse
-from telegram import Update
+from telegram import Update, ChatMemberUpdated
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, ContextTypes,
-    MessageHandler, ChatMemberHandler, filters
+    Application, ApplicationBuilder, CommandHandler,
+    MessageHandler, ChatMemberHandler, ContextTypes, filters
 )
-import database  # Tu archivo database.py con httpx
+import database
 
-# Configuración de logging
+# -----------------------------------
+# Configuración inicial
+# -----------------------------------
+
+# Logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 
-# Variables de entorno y seguridad
+# Variables de entorno
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SECRET_TOKEN = os.getenv("SECRET_TOKEN")
-ADMIN_ID = 1011479473
+ADMIN_ID = 1011479473  # Cambia esto por tu ID real si es necesario
 
 if not TELEGRAM_TOKEN:
     raise ValueError("❌ TELEGRAM_TOKEN no está definido.")
@@ -82,7 +84,7 @@ async def borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Uso: /borrar <id>")
     pid = int(context.args[0])
     uid = update.effective_user.id
-    respuesta = await database.borrar_propuesta(pid, uid)
+    respuesta = await database.borrar_propuesta(pid, uid=uid if uid != ADMIN_ID else ADMIN_ID)
     await update.message.reply_text(respuesta)
 
 async def participacion_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -106,7 +108,7 @@ async def reiniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Eventos de grupo
 # -----------------------------------
 
-async def saludo_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def saludo_grupo(update: ChatMemberUpdated, context: ContextTypes.DEFAULT_TYPE):
     if update.my_chat_member.new_chat_member.status == "member":
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -118,13 +120,13 @@ async def bienvenida_nuevos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👋 ¡Bienvenido/a {nuevo.first_name}!")
 
 # -----------------------------------
-# Configuración de FastAPI y Telegram
+# Configuración de FastAPI y Webhook
 # -----------------------------------
 
 app = FastAPI()
-bot_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+bot_app: Application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-# Handlers de comandos
+# Añadir handlers de comandos
 comandos = {
     "ayuda": ayuda, "proponer": proponer, "verpropuestas": verpropuestas,
     "votar": votar, "top": top, "borrar": borrar,
@@ -137,7 +139,7 @@ for nombre, handler in comandos.items():
 bot_app.add_handler(ChatMemberHandler(saludo_grupo, ChatMemberHandler.MY_CHAT_MEMBER))
 bot_app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_nuevos))
 
-# Endpoint del webhook
+# Ruta para Webhook
 @app.post("/webhook")
 async def telegram_webhook(
     req: Request,
@@ -146,7 +148,6 @@ async def telegram_webhook(
     if x_telegram_bot_api_secret_token != SECRET_TOKEN:
         logging.warning("⚠️ Acceso no autorizado al webhook.")
         raise HTTPException(status_code=403, detail="Token inválido")
-
     data = await req.json()
     update = Update.de_json(data, bot_app.bot)
     await bot_app.process_update(update)
@@ -156,7 +157,7 @@ async def telegram_webhook(
 async def root():
     return JSONResponse({"status": "Bot en funcionamiento 🚀"})
 
-# Eventos de inicio y apagado
+# Eventos de arranque y parada
 @app.on_event("startup")
 async def on_startup():
     await bot_app.initialize()

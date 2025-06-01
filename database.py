@@ -38,7 +38,7 @@ async def registrar_propuesta(texto: str, user) -> int:
         # Upsert participación: merge duplicates y sumar count
         up_headers = HEADERS.copy()
         up_headers["Prefer"] = "resolution=merge-duplicates"
-        upsert_payload = {"uid": user.id, "count": 1}
+        upsert_payload = {"uid": user.id, "nombre": user.first_name, "count": 1}
         await client.post(
             f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?on_conflict=uid",
             headers=up_headers,
@@ -57,10 +57,10 @@ async def obtener_propuestas() -> List[Dict[str, Any]]:
         resp.raise_for_status()
         return resp.json()
 
-async def votar_por_propuesta(pid: int, uid: int) -> str:
-    """Registra un voto y actualiza el conteo de votos."""
+async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
+    """Registra un voto y actualiza el conteo de votos y la participación."""
     async with httpx.AsyncClient() as client:
-        # Verificar voto previo
+        # Verificar si ya votó
         check = await client.get(
             f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=eq.{uid}&proposal_id=eq.{pid}",
             headers=HEADERS
@@ -87,6 +87,16 @@ async def votar_por_propuesta(pid: int, uid: int) -> str:
             f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}",
             headers=HEADERS,
             json={"votos": votos_actuales + 1}
+        )
+
+        # Upsert participación: merge duplicates y sumar count
+        up_headers = HEADERS.copy()
+        up_headers["Prefer"] = "resolution=merge-duplicates"
+        upsert_payload = {"uid": uid, "nombre": nombre, "count": 1}
+        await client.post(
+            f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?on_conflict=uid",
+            headers=up_headers,
+            json=upsert_payload
         )
 
     return "✅ ¡Voto registrado!"
