@@ -22,7 +22,8 @@ logging.basicConfig(
 # Variables de entorno
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SECRET_TOKEN = os.getenv("SECRET_TOKEN")
-ADMIN_ID = 1011479473  # Cambia esto por tu ID real si es necesario
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://bot-telegram-seo.onrender.com/webhook")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "1011479473"))  # Permite configurarlo desde fuera
 
 if not TELEGRAM_TOKEN:
     raise ValueError("❌ TELEGRAM_TOKEN no está definido.")
@@ -36,13 +37,14 @@ if not SECRET_TOKEN:
 async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = (
         "🤖 *Comandos disponibles:*\n"
-        "/proponer <texto>\n"
-        "/verpropuestas\n"
-        "/votar <id>\n"
-        "/top\n"
-        "/borrar <id>\n"
-        "/participacion\n"
-        "/reiniciar (solo admin)"
+        "/ayuda - Muestra este mensaje\n"
+        "/proponer <texto> - Proponer una nueva idea\n"
+        "/verpropuestas - Ver todas las propuestas\n"
+        "/votar <id> - Votar por una propuesta\n"
+        "/top - Ver las propuestas más votadas\n"
+        "/borrar <id> - Borrar tu propuesta (o si eres admin)\n"
+        "/participacion - Ver quiénes han participado\n"
+        "/reiniciar - Reiniciar datos (solo admin)"
     )
     await update.message.reply_text(texto, parse_mode="Markdown")
 
@@ -87,7 +89,7 @@ async def borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     respuesta = await database.borrar_propuesta(pid, uid=uid if uid != ADMIN_ID else ADMIN_ID)
     await update.message.reply_text(respuesta)
 
-async def participacion_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def participacion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     participacion = await database.obtener_participacion()
     if not participacion:
         return await update.message.reply_text("Nadie ha participado aún.")
@@ -130,7 +132,7 @@ bot_app: Application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 comandos = {
     "ayuda": ayuda, "proponer": proponer, "verpropuestas": verpropuestas,
     "votar": votar, "top": top, "borrar": borrar,
-    "participacion": participacion_cmd, "reiniciar": reiniciar
+    "participacion": participacion, "reiniciar": reiniciar
 }
 for nombre, handler in comandos.items():
     bot_app.add_handler(CommandHandler(nombre, handler))
@@ -162,12 +164,11 @@ async def root():
 async def on_startup():
     await bot_app.initialize()
     await bot_app.start()
-    webhook_url = "https://bot-telegram-seo.onrender.com/webhook"
     await bot_app.bot.set_webhook(
-        url=webhook_url,
+        url=WEBHOOK_URL,
         secret_token=SECRET_TOKEN
     )
-    logging.info(f"✅ Webhook registrado automáticamente en: {webhook_url}")
+    logging.info(f"✅ Webhook registrado automáticamente en: {WEBHOOK_URL}")
 
 @app.on_event("shutdown")
 async def on_shutdown():
