@@ -39,7 +39,29 @@ async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 *Comandos disponibles:*\n"
         "/ayuda - Muestra este mensaje\n"
         "/proponer <texto> - Proponer una nueva idea\n"
-        "/verpropuestas - Ver todas las propuestas\n"
+        "/verpropuestas - Ver tasync def reiniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("🚫 Solo el admin puede usar este comando.")
+    await database.reiniciar_datos()
+    await update.message.reply_text("🔄 Datos reiniciados. ¡Nueva ronda!")
+
+# -----------------------------------
+# Eventos de grupo
+# -----------------------------------
+
+async def saludo_grupo(update: ChatMemberUpdated, context: ContextTypes.DEFAULT_TYPE):
+    if update.my_chat_member.new_chat_member.status == "member":
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="¡Gracias por invitarme! Usa /ayuda para empezar."
+        )
+
+async def bienvenida_nuevos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    for nuevo in update.message.new_chat_members:
+        await update.message.reply_text(f"👋 ¡Bienvenido/a {nuevo.first_name}!")
+
+# -----------------------------------
+# Configuración de FastAPI y Webhooodas las propuestas\n"
         "/votar <id> - Votar por una propuesta\n"
         "/top - Ver las propuestas más votadas\n"
         "/borrar <id> - Borrar tu propuesta (o si eres admin)\n"
@@ -100,29 +122,7 @@ async def participacion(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mensaje += f"{nombre}: {p['count']} propuestas\n"
     await update.message.reply_text(mensaje.strip(), parse_mode="Markdown")
 
-async def reiniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("🚫 Solo el admin puede usar este comando.")
-    await database.reiniciar_datos()
-    await update.message.reply_text("🔄 Datos reiniciados. ¡Nueva ronda!")
-
-# -----------------------------------
-# Eventos de grupo
-# -----------------------------------
-
-async def saludo_grupo(update: ChatMemberUpdated, context: ContextTypes.DEFAULT_TYPE):
-    if update.my_chat_member.new_chat_member.status == "member":
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="¡Gracias por invitarme! Usa /ayuda para empezar."
-        )
-
-async def bienvenida_nuevos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for nuevo in update.message.new_chat_members:
-        await update.message.reply_text(f"👋 ¡Bienvenido/a {nuevo.first_name}!")
-
-# -----------------------------------
-# Configuración de FastAPI y Webhook
+k
 # -----------------------------------
 
 app = FastAPI()
