@@ -23,7 +23,7 @@ logging.basicConfig(
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SECRET_TOKEN = os.getenv("SECRET_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://bot-telegram-seo.onrender.com/webhook")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "1011479473"))  # Puedes personalizar esto
+ADMIN_ID = int(os.getenv("ADMIN_ID", "1011479473"))
 
 if not TELEGRAM_TOKEN:
     raise ValueError("❌ TELEGRAM_TOKEN no está definido.")
@@ -87,7 +87,7 @@ async def borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Uso: /borrar <id>")
     pid = int(context.args[0])
     uid = update.effective_user.id
-    respuesta = await database.borrar_propuesta(pid, uid=uid if uid != ADMIN_ID else ADMIN_ID)
+    respuesta = await database.borrar_propuesta(pid, uid=uid)
     await update.message.reply_text(respuesta)
 
 async def participacion(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -132,7 +132,7 @@ async def bienvenida_nuevos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = FastAPI()
 bot_app: Application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-# Añadir handlers de comandos
+# Handlers de comandos
 comandos = {
     "ayuda": ayuda, "proponer": proponer, "verpropuestas": verpropuestas,
     "votar": votar, "top": top, "borrar": borrar,
@@ -141,11 +141,11 @@ comandos = {
 for nombre, handler in comandos.items():
     bot_app.add_handler(CommandHandler(nombre, handler))
 
-# Handlers de eventos de grupo
+# Eventos de grupo
 bot_app.add_handler(ChatMemberHandler(saludo_grupo, ChatMemberHandler.MY_CHAT_MEMBER))
 bot_app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_nuevos))
 
-# Ruta para Webhook
+# Ruta para el Webhook de Telegram
 @app.post("/webhook")
 async def telegram_webhook(
     req: Request,
@@ -163,7 +163,7 @@ async def telegram_webhook(
 async def root():
     return JSONResponse({"status": "Bot en funcionamiento 🚀"})
 
-# Eventos de arranque y parada
+# Eventos de inicio y cierre
 @app.on_event("startup")
 async def on_startup():
     await bot_app.initialize()

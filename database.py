@@ -34,14 +34,12 @@ async def registrar_propuesta(texto, usuario):
 
     async with httpx.AsyncClient() as client:
         try:
-            # Asegurar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/insertar_participacion_si_no_existe",
                 headers=HEADERS,
                 json={"uid": uid, "nombre": nombre}
             )
 
-            # Insertar propuesta
             data = {
                 "uid_autor": uid,
                 "contenido": texto,
@@ -53,12 +51,9 @@ async def registrar_propuesta(texto, usuario):
                 headers=HEADERS,
                 json=data
             )
-
-            if response.status_code != 201:
-                logger.error("Error en respuesta al crear propuesta: %s", response.text)
-                response.raise_for_status()
-
+            response.raise_for_status()
             json_data = response.json()
+
             if isinstance(json_data, list) and json_data:
                 pid = json_data[0]["id"]
             elif isinstance(json_data, dict) and "id" in json_data:
@@ -66,7 +61,6 @@ async def registrar_propuesta(texto, usuario):
             else:
                 raise Exception("Respuesta inesperada al insertar propuesta.")
 
-            # Incrementar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
@@ -101,6 +95,7 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
                 f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=eq.{uid}&proposal_id=eq.{pid}",
                 headers=HEADERS
             )
+            check.raise_for_status()
             if check.json():
                 return "⚠️ Ya has votado por esta propuesta."
 
@@ -116,6 +111,10 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
             )
             votos_resp.raise_for_status()
             votos_data = votos_resp.json()
+
+            if not votos_data:
+                return "❌ Propuesta no encontrada."
+
             votos_actuales = votos_data[0].get("votos", 0)
 
             await client.patch(
@@ -143,7 +142,9 @@ async def borrar_propuesta(pid: int, uid: int) -> str:
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=uid_autor&id=eq.{pid}",
                 headers=HEADERS
             )
+            resp.raise_for_status()
             data = resp.json()
+
             if not data:
                 return "❌ Propuesta no encontrada."
 
