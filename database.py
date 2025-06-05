@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Variables de entorno
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -27,39 +28,50 @@ VOTES_TABLE = "votes"
 PARTICIPATION_TABLE = "participation"
 
 # ✅ Registrar propuesta
-async def registrar_propuesta(texto: str, usuario) -> int:
-    payload = {
-        "texto": texto,
-        "uid_autor": usuario.id,
-        "nombre_autor": usuario.first_name
-    }
+async def registrar_propuesta(texto, usuario):
+    uid = usuario.id
+    nombre = usuario.full_name
 
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.post(
-                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}",
-                headers={**HEADERS, "Prefer": "return=representation"},
-                json=payload
+            # Asegurar participación
+            await client.post(
+                f"{SUPABASE_URL}/rest/v1/rpc/insertar_participacion_si_no_existe",
+                headers=HEADERS,
+                json={"uid": uid, "nombre": nombre}
             )
 
-            if resp.status_code == 409:
-                logging.error(f"409 Conflict: {resp.text}")
-                raise Exception("Conflicto al insertar en la tabla proposals.")
+            # Insertar propuesta
+            data = {
+                "uid_autor": uid,
+                "contenido": texto,
+            }
 
-            resp.raise_for_status()
-            data = resp.json()
-            pid = data[0]["id"]
+            response = await client.post(
+                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}",
+                headers=HEADERS,
+                json=data
+            )
+            response.raise_for_status()
 
-            # Actualizar participación
+            json_data = response.json()
+            if isinstance(json_data, list) and json_data:
+                pid = json_data[0]["id"]
+            else:
+                logger.error("Respuesta inesperada del backend: %s", json_data)
+                raise Exception("Respuesta inesperada al insertar propuesta.")
+
+            # Incrementar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
-                json={"uid_input": usuario.id, "nombre_input": usuario.first_name}
+                json={"uid_input": uid, "nombre_input": usuario.first_name}
             )
 
             return pid
+
         except Exception as e:
-            logging.error(f"Error registrando propuesta: {e}")
+            logger.error(f"Error registrando propuesta: {e}")
             raise
 
 # ✅ Obtener propuestas
@@ -73,14 +85,13 @@ async def obtener_propuestas() -> List[Dict[str, Any]]:
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
-            logging.error(f"Error obteniendo propuestas: {e}")
+            logger.error(f"Error obteniendo propuestas: {e}")
             return []
 
 # ✅ Votar por propuesta
 async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
     async with httpx.AsyncClient() as client:
         try:
-            # Verificar si ya votó
             check = await client.get(
                 f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=eq.{uid}&proposal_id=eq.{pid}",
                 headers=HEADERS
@@ -88,14 +99,12 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
             if check.json():
                 return "⚠️ Ya has votado por esta propuesta."
 
-            # Insertar voto
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}",
                 headers=HEADERS,
                 json={"uid": uid, "proposal_id": pid}
             )
 
-            # Obtener votos actuales
             votos_resp = await client.get(
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=votos&id=eq.{pid}",
                 headers=HEADERS
@@ -104,14 +113,12 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
             votos_data = votos_resp.json()
             votos_actuales = votos_data[0].get("votos", 0)
 
-            # Actualizar contador de votos
             await client.patch(
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}",
                 headers=HEADERS,
                 json={"votos": votos_actuales + 1}
             )
 
-            # Actualizar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
@@ -120,7 +127,7 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
 
             return "✅ ¡Voto registrado!"
         except Exception as e:
-            logging.error(f"Error votando por propuesta: {e}")
+            logger.error(f"Error votando por propuesta: {e}")
             return "❌ Error al votar."
 
 # ✅ Borrar propuesta
@@ -139,13 +146,12 @@ async def borrar_propuesta(pid: int, uid: int) -> str:
             if uid != autor_id and uid != ADMIN_ID:
                 return "🚫 Solo el autor o el admin pueden borrar esta propuesta."
 
-            # Borrar votos y propuesta
             await client.delete(f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?proposal_id=eq.{pid}", headers=HEADERS)
             await client.delete(f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}", headers=HEADERS)
 
             return "✅ Propuesta eliminada."
         except Exception as e:
-            logging.error(f"Error borrando propuesta: {e}")
+            logger.error(f"Error borrando propuesta: {e}")
             return "❌ Error al intentar eliminar."
 
 # ✅ Obtener top propuestas
@@ -159,7 +165,7 @@ async def obtener_top_propuestas(limit: int = 5) -> List[Dict[str, Any]]:
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
-            logging.error(f"Error obteniendo top propuestas: {e}")
+            logger.error(f"Error obteniendo top propuestas: {e}")
             return []
 
 # ✅ Obtener participación
@@ -173,7 +179,7 @@ async def obtener_participacion() -> List[Dict[str, Any]]:
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
-            logging.error(f"Error obteniendo participación: {e}")
+            logger.error(f"Error obteniendo participación: {e}")
             return []
 
 # ✅ Reiniciar todo
@@ -185,7 +191,7 @@ async def reiniciar_datos() -> None:
             await client.delete(f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=gt.0", headers=HEADERS)
             await reiniciar_conteo_propuestas()
         except Exception as e:
-            logging.error(f"Error al reiniciar datos: {e}")
+            logger.error(f"Error al reiniciar datos: {e}")
 
 # ✅ Reiniciar secuencia de IDs
 async def reiniciar_conteo_propuestas() -> None:
@@ -197,4 +203,4 @@ async def reiniciar_conteo_propuestas() -> None:
                 json={}
             )
         except Exception as e:
-            logging.error(f"Error al reiniciar secuencia de IDs: {e}")
+            logger.error(f"Error al reiniciar secuencia de IDs: {e}")
