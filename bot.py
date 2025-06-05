@@ -69,7 +69,8 @@ async def votar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Uso: /votar <id>")
     pid = int(context.args[0])
     uid = update.effective_user.id
-    respuesta = await database.votar_por_propuesta(pid, uid)
+    nombre = update.effective_user.first_name
+    respuesta = await database.votar_por_propuesta(pid, uid, nombre)
     await update.message.reply_text(respuesta)
 
 async def top(update: Update, context: ContextTypes.DEFAULT_TYPE):
