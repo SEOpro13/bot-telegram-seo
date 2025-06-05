@@ -26,32 +26,37 @@ PROPOSALS_TABLE = "proposals"
 VOTES_TABLE = "votes"
 PARTICIPATION_TABLE = "participation"
 
-# ✅ Registrar nueva propuesta
-async def registrar_propuesta(texto: str, user) -> int:
+# ✅ Registrar propuesta
+async def registrar_propuesta(texto: str, usuario) -> int:
+    payload = {
+        "texto": texto,
+        "uid_autor": usuario.id,
+        "nombre_autor": usuario.first_name
+    }
+
     async with httpx.AsyncClient() as client:
-        payload = {
-            "texto": texto,
-            "uid_autor": user.id,
-            "nombre_autor": user.first_name
-        }
         try:
             resp = await client.post(
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}",
                 headers={**HEADERS, "Prefer": "return=representation"},
                 json=payload
             )
+
+            if resp.status_code == 409:
+                logging.error(f"409 Conflict: {resp.text}")
+                raise Exception("Conflicto al insertar en la tabla proposals.")
+
             resp.raise_for_status()
             data = resp.json()
-            if not data or "id" not in data[0]:
-                raise ValueError("❌ Error al insertar propuesta.")
             pid = data[0]["id"]
 
             # Actualizar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
-                json={"uid_input": user.id, "nombre_input": user.first_name}
+                json={"uid_input": usuario.id, "nombre_input": usuario.first_name}
             )
+
             return pid
         except Exception as e:
             logging.error(f"Error registrando propuesta: {e}")
