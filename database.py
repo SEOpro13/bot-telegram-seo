@@ -41,11 +41,11 @@ async def registrar_propuesta(texto, usuario):
                 json={"uid": uid, "nombre": nombre}
             )
 
-            # Insertar propuesta con campo votos inicializado
+            # Insertar propuesta
             data = {
                 "uid_autor": uid,
                 "contenido": texto,
-                "votos": 0  # ⬅️ Asegura que el campo requerido esté presente
+                "votos": 0
             }
 
             response = await client.post(
@@ -64,7 +64,6 @@ async def registrar_propuesta(texto, usuario):
             elif isinstance(json_data, dict) and "id" in json_data:
                 pid = json_data["id"]
             else:
-                logger.error("Respuesta inesperada del backend: %s", json_data)
                 raise Exception("Respuesta inesperada al insertar propuesta.")
 
             # Incrementar participación
