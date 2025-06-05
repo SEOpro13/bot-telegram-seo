@@ -23,7 +23,7 @@ logging.basicConfig(
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SECRET_TOKEN = os.getenv("SECRET_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://bot-telegram-seo.onrender.com/webhook")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "1011479473"))  # Permite configurarlo desde fuera
+ADMIN_ID = int(os.getenv("ADMIN_ID", "1011479473"))  # Puedes personalizar esto
 
 if not TELEGRAM_TOKEN:
     raise ValueError("❌ TELEGRAM_TOKEN no está definido.")
@@ -96,8 +96,11 @@ async def participacion(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Nadie ha participado aún.")
     mensaje = "📊 *Participación:*\n"
     for p in participacion:
-        member = await context.bot.get_chat_member(update.effective_chat.id, p["uid"])
-        nombre = member.user.first_name or "Usuario"
+        try:
+            member = await context.bot.get_chat_member(update.effective_chat.id, p["uid"])
+            nombre = member.user.first_name or "Usuario"
+        except:
+            nombre = p["nombre"]
         mensaje += f"{nombre}: {p['count']} propuestas\n"
     await update.message.reply_text(mensaje.strip(), parse_mode="Markdown")
 

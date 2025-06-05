@@ -42,7 +42,7 @@ async def registrar_propuesta(texto: str, user) -> int:
             )
             resp.raise_for_status()
             data = resp.json()
-            if not data:
+            if not data or "id" not in data[0]:
                 raise ValueError("❌ Error al insertar propuesta.")
             pid = data[0]["id"]
 
@@ -75,7 +75,7 @@ async def obtener_propuestas() -> List[Dict[str, Any]]:
 async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
     async with httpx.AsyncClient() as client:
         try:
-            # Ya votó
+            # Verificar si ya votó
             check = await client.get(
                 f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=eq.{uid}&proposal_id=eq.{pid}",
                 headers=HEADERS
@@ -95,10 +95,11 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=votos&id=eq.{pid}",
                 headers=HEADERS
             )
+            votos_resp.raise_for_status()
             votos_data = votos_resp.json()
             votos_actuales = votos_data[0].get("votos", 0)
 
-            # Actualizar contador
+            # Actualizar contador de votos
             await client.patch(
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}",
                 headers=HEADERS,
@@ -113,7 +114,6 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
             )
 
             return "✅ ¡Voto registrado!"
-
         except Exception as e:
             logging.error(f"Error votando por propuesta: {e}")
             return "❌ Error al votar."
@@ -139,12 +139,11 @@ async def borrar_propuesta(pid: int, uid: int) -> str:
             await client.delete(f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}", headers=HEADERS)
 
             return "✅ Propuesta eliminada."
-
         except Exception as e:
             logging.error(f"Error borrando propuesta: {e}")
             return "❌ Error al intentar eliminar."
 
-# ✅ Top propuestas
+# ✅ Obtener top propuestas
 async def obtener_top_propuestas(limit: int = 5) -> List[Dict[str, Any]]:
     async with httpx.AsyncClient() as client:
         try:
@@ -158,7 +157,7 @@ async def obtener_top_propuestas(limit: int = 5) -> List[Dict[str, Any]]:
             logging.error(f"Error obteniendo top propuestas: {e}")
             return []
 
-# ✅ Participación
+# ✅ Obtener participación
 async def obtener_participacion() -> List[Dict[str, Any]]:
     async with httpx.AsyncClient() as client:
         try:
@@ -172,8 +171,8 @@ async def obtener_participacion() -> List[Dict[str, Any]]:
             logging.error(f"Error obteniendo participación: {e}")
             return []
 
-# ✅ Reset general
-async def reiniciar_datos():
+# ✅ Reiniciar todo
+async def reiniciar_datos() -> None:
     async with httpx.AsyncClient() as client:
         try:
             await client.delete(f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=gt.0", headers=HEADERS)
@@ -183,8 +182,8 @@ async def reiniciar_datos():
         except Exception as e:
             logging.error(f"Error al reiniciar datos: {e}")
 
-# ✅ Reset secuencia de IDs
-async def reiniciar_conteo_propuestas():
+# ✅ Reiniciar secuencia de IDs
+async def reiniciar_conteo_propuestas() -> None:
     async with httpx.AsyncClient() as client:
         try:
             await client.post(
