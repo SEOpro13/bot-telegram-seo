@@ -77,38 +77,44 @@ async def registrar_propuesta(texto, usuario):
             logger.error(f"Error registrando propuesta: {e}")
             raise
 
-# ✅ Obtener propuestas
-async def obtener_propuestas() -> List[Dict[str, Any]]:
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(
-                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=*&order=id.asc",
-                headers=HEADERS
-            )
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            logger.error(f"Error obteniendo propuestas: {e}")
-            return []
+# ✅ Ver propuestas
+async def verpropuestas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    propuestas = await obtener_propuestas()
+
+    if not propuestas:
+        await update.message.reply_text("No hay propuestas registradas aún.")
+        return
+
+    mensaje = "📋 *Lista de propuestas:*\n\n"
+    for p in propuestas:
+        nombre = p.get("nombre_autor", "Anónimo")
+        mensaje += f"#{p['id']}: {p['contenido']} (👤 {nombre}, 👍 {p['votos']})\n"
+
+    await update.message.reply_text(mensaje, parse_mode=ParseMode.MARKDOWN)
 
 # ✅ Votar por propuesta
 async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
     async with httpx.AsyncClient() as client:
         try:
-            check = await client.get(
+            # 1. Verificar si ya ha votado
+            check_resp = await client.get(
                 f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=eq.{uid}&proposal_id=eq.{pid}",
                 headers=HEADERS
             )
-            check.raise_for_status()
-            if check.json():
+            check_resp.raise_for_status()
+            votos_previos = check_resp.json()
+            if votos_previos:
                 return "⚠️ Ya has votado por esta propuesta."
 
-            await client.post(
+            # 2. Registrar el voto
+            voto_resp = await client.post(
                 f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}",
                 headers=HEADERS,
                 json={"uid": uid, "proposal_id": pid}
             )
+            voto_resp.raise_for_status()
 
+            # 3. Obtener votos actuales de la propuesta
             votos_resp = await client.get(
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=votos&id=eq.{pid}",
                 headers=HEADERS
@@ -121,22 +127,30 @@ async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
 
             votos_actuales = votos_data[0].get("votos", 0)
 
-            await client.patch(
+            # 4. Incrementar votos de la propuesta
+            patch_resp = await client.patch(
                 f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=eq.{pid}",
                 headers=HEADERS,
                 json={"votos": votos_actuales + 1}
             )
+            patch_resp.raise_for_status()
 
-            await client.post(
+            # 5. Incrementar participación
+            participacion_resp = await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
                 json={"uid_input": uid, "nombre_input": nombre}
             )
+            participacion_resp.raise_for_status()
 
             return "✅ ¡Voto registrado!"
+        
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ HTTP error al votar: {e.response.status_code} - {e.response.text}")
+            return "❌ Error al votar (HTTP)."
         except Exception as e:
-            logger.error(f"Error votando por propuesta: {e}")
-            return "❌ Error al votar."
+            logger.error(f"❌ Error inesperado al votar: {e}")
+            return "❌ Error inesperado al votar."
 
 # ✅ Borrar propuesta
 async def borrar_propuesta(pid: int, uid: int) -> str:
@@ -169,48 +183,100 @@ async def obtener_top_propuestas(limit: int = 5) -> List[Dict[str, Any]]:
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(
-                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=*&order=votos.desc&limit={limit}",
+                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=id,uid_autor,contenido,votos,created_at&order=votos.desc&limit={limit}",
                 headers=HEADERS
             )
             resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            logger.error(f"Error obteniendo top propuestas: {e}")
+            data = resp.json()
+
+            if not isinstance(data, list):
+                logger.error("❌ Formato inesperado en respuesta de top propuestas")
+                return []
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ HTTP error obteniendo top propuestas: {e.response.status_code} - {e.response.text}")
             return []
+
+        except Exception as e:
+            logger.error(f"❌ Error inesperado obteniendo top propuestas: {e}")
+            return []
+
 
 # ✅ Obtener participación
 async def obtener_participacion() -> List[Dict[str, Any]]:
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(
-                f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?select=*&order=count.desc",
+                f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?select=uid,nombre,count&order=count.desc",
                 headers=HEADERS
             )
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+
+            if not isinstance(data, list):
+                logger.error("❌ Formato inesperado en respuesta de participación")
+                return []
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ HTTP error obteniendo participación: {e.response.status_code} - {e.response.text}")
+            return []
+
         except Exception as e:
-            logger.error(f"Error obteniendo participación: {e}")
+            logger.error(f"❌ Error inesperado obteniendo participación: {e}")
             return []
 
 # ✅ Reiniciar todo
 async def reiniciar_datos() -> None:
     async with httpx.AsyncClient() as client:
         try:
-            await client.delete(f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=gt.0", headers=HEADERS)
-            await client.delete(f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?uid=gt.0", headers=HEADERS)
-            await client.delete(f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=gt.0", headers=HEADERS)
+            # Eliminar votos
+            r1 = await client.delete(
+                f"{SUPABASE_URL}/rest/v1/{VOTES_TABLE}?uid=gt.0",
+                headers=HEADERS
+            )
+            r1.raise_for_status()
+
+            # Eliminar participación
+            r2 = await client.delete(
+                f"{SUPABASE_URL}/rest/v1/{PARTICIPATION_TABLE}?uid=gt.0",
+                headers=HEADERS
+            )
+            r2.raise_for_status()
+
+            # Eliminar propuestas
+            r3 = await client.delete(
+                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?id=gt.0",
+                headers=HEADERS
+            )
+            r3.raise_for_status()
+
+            # Reiniciar el conteo (por ejemplo, si llevas un ID o log de propuestas)
             await reiniciar_conteo_propuestas()
+
+            logger.info("✅ Datos reiniciados correctamente.")
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ HTTP error al reiniciar datos: {e.response.status_code} - {e.response.text}")
+
         except Exception as e:
-            logger.error(f"Error al reiniciar datos: {e}")
+            logger.error(f"❌ Error inesperado al reiniciar datos: {e}")
 
 # ✅ Reiniciar secuencia de IDs
 async def reiniciar_conteo_propuestas() -> None:
     async with httpx.AsyncClient() as client:
         try:
-            await client.post(
+            resp = await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/reset_proposal_id_sequence",
                 headers=HEADERS,
                 json={}
             )
+            resp.raise_for_status()
+            logger.info("✅ Secuencia de IDs reiniciada correctamente.")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ Error HTTP al reiniciar secuencia: {e.response.status_code} - {e.response.text}")
         except Exception as e:
-            logger.error(f"Error al reiniciar secuencia de IDs: {e}")
+            logger.error(f"❌ Error inesperado al reiniciar secuencia de IDs: {e}")
