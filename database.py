@@ -30,7 +30,7 @@ VOTES_TABLE = "votes"
 PARTICIPATION_TABLE = "participation"
 
 # ✅ Registrar propuesta
-async def registrar_propuesta(texto, usuario):
+async def obtener_propuesta(texto, usuario):
     uid = usuario.id
     nombre = usuario.full_name
 

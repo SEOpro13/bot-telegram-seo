@@ -52,7 +52,7 @@ async def proponer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return await update.message.reply_text("Uso: /proponer <texto>")
     texto = " ".join(context.args)
-    pid = await database.registrar_propuesta(texto, update.effective_user)
+    pid = await database.obtener_propuesta(texto, update.effective_user)
     await update.message.reply_text(f"✅ Propuesta #{pid} registrada:\n» {texto}")
 
 async def verpropuestas(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,10 +105,13 @@ async def participacion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(mensaje.strip(), parse_mode="Markdown")
 
 async def reiniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("🚫 Solo el admin puede usar este comando.")
-    await database.reiniciar_datos()
-    await update.message.reply_text("🔄 Datos reiniciados. ¡Nueva ronda!")
+    usuario = update.effective_user
+    if usuario.id != ADMIN_ID:
+        await update.message.reply_text("🚫 No tienes permiso para usar este comando.")
+        return
+
+    await reiniciar_datos()
+    await update.message.reply_text("✅ Datos reiniciados.")
 
 # -----------------------------------
 # Eventos de grupo
