@@ -79,20 +79,20 @@ async def obtener_propuesta(texto, usuario):
             logger.error(f"Error registrando propuesta: {e}")
             raise
 
-# ✅ Ver propuestas
-async def verpropuestas(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    propuestas = await obtener_propuestas()
+# database.py
 
-    if not propuestas:
-        await update.message.reply_text("No hay propuestas registradas aún.")
-        return
-
-    mensaje = "📋 *Lista de propuestas:*\n\n"
-    for p in propuestas:
-        nombre = p.get("nombre_autor", "Anónimo")
-        mensaje += f"#{p['id']}: {p['contenido']} (👤 {nombre}, 👍 {p['votos']})\n"
-
-    await update.message.reply_text(mensaje, parse_mode=ParseMode.MARKDOWN)
+async def obtener_propuestas():
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{SUPABASE_URL}/rest/v1/{PROPOSALS_TABLE}?select=id,contenido,votos,nombre_autor",
+                headers=HEADERS
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"❌ Error al obtener propuestas: {e}")
+            return []
 
 # ✅ Votar por propuesta
 async def votar_por_propuesta(pid: int, uid: int, nombre: str) -> str:
