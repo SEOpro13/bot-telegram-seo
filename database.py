@@ -2,6 +2,8 @@ import os
 import httpx
 import logging
 from typing import List, Dict, Any
+from telegram import Update
+from telegram.ext import ContextTypes
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
