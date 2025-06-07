@@ -15,11 +15,11 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("❌ Las variables de entorno SUPABASE_URL y SUPABASE_ANON_KEY deben estar definidas.")
 
-# Headers para Supabase
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"  # 👈 Esto es crucial
 }
 
 # Tablas
