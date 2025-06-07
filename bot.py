@@ -8,6 +8,9 @@ from telegram.ext import (
     MessageHandler, ChatMemberHandler, ContextTypes, filters
 )
 import database
+print("Usando archivo database desde:", database.__file__)
+print("Tiene funciones:", dir(database))
+
 
 # -----------------------------------
 # Configuración inicial
