@@ -51,15 +51,19 @@ async def registrar_propuesta(texto, usuario):
                 headers=HEADERS,
                 json=data
             )
-            response.raise_for_status()
-            json_data = response.json()
+
+            try:
+                json_data = response.json()
+            except Exception:
+                logger.error("❌ No se pudo convertir a JSON: %s", response.text)
+                raise ValueError("Respuesta no válida al insertar propuesta.")
 
             if isinstance(json_data, list) and json_data:
-                pid = json_data[0]["id"]
+                pid = json_data[0].get("id")
             elif isinstance(json_data, dict) and "id" in json_data:
                 pid = json_data["id"]
             else:
-                raise Exception("Respuesta inesperada al insertar propuesta.")
+                raise ValueError("❌ Respuesta inesperada al insertar propuesta: %s" % json_data)
 
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",

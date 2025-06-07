@@ -154,7 +154,11 @@ async def telegram_webhook(
     if x_telegram_bot_api_secret_token != SECRET_TOKEN:
         logging.warning("⚠️ Acceso no autorizado al webhook.")
         raise HTTPException(status_code=403, detail="Token inválido")
+    try:
     data = await req.json()
+except Exception as e:
+    logging.error(f"❌ Error al decodificar JSON del webhook: {e}")
+    raise HTTPException(status_code=400, detail="JSON inválido o vacío")
     update = Update.de_json(data, bot_app.bot)
     await bot_app.process_update(update)
     return {"ok": True}
