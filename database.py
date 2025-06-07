@@ -52,12 +52,8 @@ async def registrar_propuesta(texto, usuario):
                 json=data
             )
 
-            if response.status_code >= 400 or not response.text.strip():
-                logger.error("❌ Respuesta vacía o con error HTTP (%s): %s", response.status_code, response.text)
-                raise ValueError("Respuesta vacía o no válida al insertar propuesta.")
-
             try:
-                json_data = await response.json()
+                json_data = response.json()  # ❌ No usar await aquí
             except Exception:
                 logger.error("❌ No se pudo convertir a JSON: %s", response.text)
                 raise ValueError("Respuesta no válida al insertar propuesta.")
@@ -67,8 +63,7 @@ async def registrar_propuesta(texto, usuario):
             elif isinstance(json_data, dict) and "id" in json_data:
                 pid = json_data["id"]
             else:
-                logger.error("❌ Respuesta inesperada al insertar propuesta: %s", json_data)
-                raise ValueError("Respuesta inesperada al insertar propuesta.")
+                raise ValueError("❌ Respuesta inesperada al insertar propuesta: %s" % json_data)
 
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
