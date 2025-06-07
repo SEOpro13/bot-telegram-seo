@@ -34,14 +34,12 @@ async def registrar_propuesta(texto, usuario):
 
     async with httpx.AsyncClient() as client:
         try:
-            # Registrar participación si no existe
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/insertar_participacion_si_no_existe",
                 headers=HEADERS,
                 json={"uid": uid, "nombre": nombre}
             )
 
-            # Crear propuesta
             data = {
                 "uid_autor": uid,
                 "contenido": texto,
@@ -53,6 +51,10 @@ async def registrar_propuesta(texto, usuario):
                 headers=HEADERS,
                 json=data
             )
+
+            if response.status_code >= 400 or not response.text.strip():
+                logger.error("❌ Respuesta vacía o con error HTTP (%s): %s", response.status_code, response.text)
+                raise ValueError("Respuesta vacía o no válida al insertar propuesta.")
 
             try:
                 json_data = await response.json()
@@ -68,7 +70,6 @@ async def registrar_propuesta(texto, usuario):
                 logger.error("❌ Respuesta inesperada al insertar propuesta: %s", json_data)
                 raise ValueError("Respuesta inesperada al insertar propuesta.")
 
-            # Incrementar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
