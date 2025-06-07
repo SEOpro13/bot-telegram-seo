@@ -34,12 +34,14 @@ async def registrar_propuesta(texto, usuario):
 
     async with httpx.AsyncClient() as client:
         try:
+            # Registrar participación si no existe
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/insertar_participacion_si_no_existe",
                 headers=HEADERS,
                 json={"uid": uid, "nombre": nombre}
             )
 
+            # Crear propuesta
             data = {
                 "uid_autor": uid,
                 "contenido": texto,
@@ -53,7 +55,7 @@ async def registrar_propuesta(texto, usuario):
             )
 
             try:
-                json_data = response.json()
+                json_data = await response.json()
             except Exception:
                 logger.error("❌ No se pudo convertir a JSON: %s", response.text)
                 raise ValueError("Respuesta no válida al insertar propuesta.")
@@ -63,8 +65,10 @@ async def registrar_propuesta(texto, usuario):
             elif isinstance(json_data, dict) and "id" in json_data:
                 pid = json_data["id"]
             else:
-                raise ValueError("❌ Respuesta inesperada al insertar propuesta: %s" % json_data)
+                logger.error("❌ Respuesta inesperada al insertar propuesta: %s", json_data)
+                raise ValueError("Respuesta inesperada al insertar propuesta.")
 
+            # Incrementar participación
             await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/incrementar_participacion",
                 headers=HEADERS,
